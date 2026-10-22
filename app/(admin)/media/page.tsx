@@ -72,12 +72,6 @@ export default async function MediaPage({
   return (
     <main className="mx-auto min-h-screen max-w-7xl px-6 py-12">
       <header className="space-y-5">
-        <Link
-          href="/dashboard"
-          className="inline-block text-sm text-gray-400 transition-colors hover:text-white"
-        >
-          ← Back to Dashboard
-        </Link>
 
         <div>
           <p className="text-sm font-semibold tracking-[0.2em] text-gray-500">
