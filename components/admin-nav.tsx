@@ -40,6 +40,11 @@ const navigation = [
     href: "/ai-generation-examples",
     number: "10",
   },
+  {
+    label: "LLM Catalog",
+    href: "/llm-catalog",
+    number: "11",
+  },
 ];
 
 export default function AdminNav() {
