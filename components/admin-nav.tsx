@@ -35,6 +35,11 @@ const navigation = [
     href: "/terms",
     number: "09",
   },
+  {
+    label: "AI Generation Examples",
+    href: "/ai-generation-examples",
+    number: "10",
+  },
 ];
 
 export default function AdminNav() {
