@@ -30,6 +30,11 @@ const navigation = [
     href: "/prompt-chain-mix",
     number: "08",
   },
+  {
+    label: "Terms",
+    href: "/terms",
+    number: "09",
+  },
 ];
 
 export default function AdminNav() {
