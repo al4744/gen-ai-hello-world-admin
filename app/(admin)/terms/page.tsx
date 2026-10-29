@@ -1,8 +1,10 @@
+import ActionForm from "@/components/action-form";
+import SubmitButton from "@/components/submit-button";
 
 import Link from "next/link";
 import { connection } from "next/server";
 import { requireSuperadmin } from "@/lib/auth/require-superadmin";
-import { createTerm, updateTerm, deleteTerm } from "./actions";
+import { createTerm, updateTerm } from "./actions";
 
 export const instant = false;
 
@@ -132,7 +134,7 @@ export default async function TermsPage({
           </span>
         </div>
 
-        <form action={createTerm} className="mt-8 space-y-6">
+        <ActionForm action={createTerm} errorTitle="Unable to create term" className="mt-8 space-y-6">
           <div className="grid gap-6 md:grid-cols-2">
             <div>
               <label
@@ -205,14 +207,14 @@ export default async function TermsPage({
               </span>
             </label>
 
-            <button
+            <SubmitButton
               type="submit"
               className="cursor-pointer rounded-xl bg-white px-6 py-3 text-sm font-semibold text-black transition-colors hover:bg-gray-200"
             >
               Create term
-            </button>
+            </SubmitButton>
           </div>
-        </form>
+        </ActionForm>
       </section>
 
       {/* READ */}
@@ -293,8 +295,9 @@ export default async function TermsPage({
                     Edit term
                   </summary>
 
-                  <form
+                  <ActionForm
                     action={updateTerm}
+                    errorTitle="Unable to update term"
                     className="space-y-6 border-t border-white/10 p-6"
                   >
                     <input
@@ -375,68 +378,26 @@ export default async function TermsPage({
                         </span>
                       </label>
 
-                      <button
+                      <SubmitButton
                         type="submit"
                         className="cursor-pointer rounded-xl bg-white px-5 py-3 text-sm font-semibold text-black hover:bg-gray-200"
                       >
                         Save changes
-                      </button>
+                      </SubmitButton>
                     </div>
-                  </form>
+                  </ActionForm>
                 </details>
 
                 {/* DELETE */}
-                <details className="border-t border-rose-500/15">
-                  <summary className="cursor-pointer p-5 text-sm font-medium text-rose-300 hover:bg-rose-500/[0.04]">
-                    Delete term
-                  </summary>
-
-                  <form
-                    action={deleteTerm}
-                    className="space-y-5 border-t border-rose-500/15 bg-rose-500/[0.025] p-6"
+                <div className="border-t border-rose-500/15 p-5">
+                  <Link
+                    href={`/delete/term/${item.id}`}
+                    aria-label={`Delete term ${item.term}`}
+                    className="inline-block cursor-pointer rounded-xl border border-rose-500/40 bg-rose-500/10 px-5 py-3 text-sm font-semibold text-rose-300 transition-colors hover:bg-rose-500/20 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-rose-400 motion-reduce:transition-none"
                   >
-                    <input
-                      type="hidden"
-                      name="id"
-                      value={item.id}
-                    />
-
-                    <p className="text-sm leading-6 text-gray-400">
-                      This permanently deletes the term from
-                      Supabase. To confirm, type the exact phrase:
-                    </p>
-
-                    <p className="break-all rounded-lg border border-rose-500/20 bg-black/30 p-3 font-mono text-sm text-rose-300">
-                      DELETE {item.term}
-                    </p>
-
-                    <div>
-                      <label
-                        htmlFor={`delete-${item.id}`}
-                        className="block text-sm font-medium text-gray-300"
-                      >
-                        Confirmation
-                      </label>
-
-                      <input
-                        id={`delete-${item.id}`}
-                        name="confirmation"
-                        type="text"
-                        required
-                        autoComplete="off"
-                        placeholder="Type the exact phrase above"
-                        className="mt-3 w-full rounded-xl border border-rose-500/30 bg-black/20 px-4 py-3 text-white outline-none focus:border-rose-400"
-                      />
-                    </div>
-
-                    <button
-                      type="submit"
-                      className="cursor-pointer rounded-xl border border-rose-500/40 bg-rose-500/10 px-5 py-3 text-sm font-semibold text-rose-300 hover:bg-rose-500/20"
-                    >
-                      Permanently delete term
-                    </button>
-                  </form>
-                </details>
+                    Permanently delete term
+                  </Link>
+                </div>
               </article>
             ))}
           </div>

@@ -1,8 +1,10 @@
+import ActionForm from "@/components/action-form";
+import SubmitButton from "@/components/submit-button";
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireSuperadmin } from "@/lib/auth/require-superadmin";
-import { deleteBattle, saveCaption } from "./actions";
+import { saveCaption } from "./actions";
 import ReplaceImageForm from "./replace-image-form";
 
 export const instant = false;
@@ -117,20 +119,19 @@ export default async function EditMediaPage({
         >
           {query.error === "invalid"
             ? "Caption must contain between 1 and 500 characters."
-            : query.error === "confirmation"
-              ? "Deletion confirmation did not match."
-              : query.error === "delete"
-                ? "Could not delete the battle. Please try again."
-                : "Unable to save caption. Please try again."}
+            : query.error === "delete"
+              ? "Could not delete the battle. Please try again."
+              : "Unable to save caption. Please try again."}
         </p>
       )}
 
       {/* Caption editing */}
       <section className="mt-8 space-y-6">
         {captions.map((caption, index) => (
-          <form
+          <ActionForm
             key={caption.id}
             action={saveCaption}
+            errorTitle="Unable to save caption"
             className="rounded-2xl border border-white/15 p-6"
           >
             <input
@@ -173,12 +174,12 @@ export default async function EditMediaPage({
                 Maximum 500 characters
               </p>
 
-              <button
+              <SubmitButton
                 type="submit"
                 className="rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-gray-200"
               >
                 Save Caption
-              </button>
+              </SubmitButton>
             </div>
 
             {query.saved === String(caption.id) && (
@@ -189,7 +190,7 @@ export default async function EditMediaPage({
                 Caption saved successfully.
               </p>
             )}
-          </form>
+          </ActionForm>
         ))}
       </section>
 
@@ -210,45 +211,13 @@ export default async function EditMediaPage({
           This action cannot be undone.
         </p>
 
-        <form
-          action={deleteBattle}
-          className="mt-6 space-y-4"
+        <Link
+          href={`/delete/battle/${battle.id}`}
+          aria-label={`Permanently delete battle #${battle.id}`}
+          className="mt-6 inline-block rounded-xl border border-red-500/40 bg-red-500/10 px-5 py-3 text-sm font-semibold text-red-300 transition-colors hover:bg-red-500/20 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-red-400 motion-reduce:transition-none"
         >
-          <input
-            type="hidden"
-            name="battleId"
-            value={battle.id}
-          />
-
-          <label
-            htmlFor="delete-confirmation"
-            className="block text-sm text-gray-300"
-          >
-            Type{" "}
-            <strong className="font-semibold text-white">
-              DELETE {battle.id}
-            </strong>{" "}
-            to confirm.
-          </label>
-
-          <input
-            id="delete-confirmation"
-            name="confirmation"
-            type="text"
-            required
-            autoComplete="off"
-            spellCheck={false}
-            placeholder={`DELETE ${battle.id}`}
-            className="w-full rounded-xl border border-white/20 bg-white/[0.04] p-3 text-white outline-none focus:border-red-400"
-          />
-
-          <button
-            type="submit"
-            className="rounded-xl border border-red-500/40 bg-red-500/10 px-5 py-3 text-sm font-semibold text-red-300 transition-colors hover:bg-red-500/20"
-          >
-            Permanently Delete Battle
-          </button>
-        </form>
+          Permanently Delete Battle
+        </Link>
       </section>
     </main>
   );

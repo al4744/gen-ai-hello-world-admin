@@ -1,15 +1,27 @@
 
 import { connection } from "next/server";
 import { requireSuperadmin } from "@/lib/auth/require-superadmin";
+import MixSettingsForm, { MixFeedback } from "./mix-settings-form";
 
 export const instant = false;
 
-export default async function PromptChainsPage() {
+type PromptChainsPageProps = {
+  searchParams: Promise<{
+    updated?: string;
+    error?: string;
+    chain?: string;
+  }>;
+};
+
+export default async function PromptChainsPage({
+  searchParams,
+}: PromptChainsPageProps) {
   // Render using the current request.
   await connection();
 
   // Reuse the existing Week 6 superadmin authorization.
   const { supabase } = await requireSuperadmin();
+  const params = await searchParams;
 
   // Load chains, steps, and mix without altering any records.
   const [chainsResult, stepsResult, mixResult] =
@@ -57,6 +69,16 @@ export default async function PromptChainsPage() {
     (mix) => mix.enabled && mix.weight > 0
   ).length;
 
+  // Keep mix records visible even if their chain definition is unavailable.
+  const chainIds = new Set(chains.map((chain) => chain.id));
+  const unmatchedMixes = mixes.filter((mix) => !chainIds.has(mix.chain_id));
+  const feedback = params.error === "last-active"
+    ? "last-active"
+    : params.updated === "1"
+      ? "updated"
+      : undefined;
+  const hasFeedbackTarget = mixes.some((mix) => mix.chain_id === params.chain);
+
   return (
     <main className="mx-auto min-h-screen max-w-7xl px-6 py-12">
       <header>
@@ -75,7 +97,7 @@ export default async function PromptChainsPage() {
       </header>
 
       {/* Configuration statistics */}
-      <section className="mt-12 grid gap-4 sm:grid-cols-3">
+      <section className="mt-12 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <article className="rounded-2xl border border-white/15 bg-white/[0.03] p-6">
           <p className="text-sm text-gray-400">
             Prompt chains
@@ -108,7 +130,19 @@ export default async function PromptChainsPage() {
             {enabledChains}
           </p>
           <p className="mt-3 text-xs text-gray-500">
-            Enabled with a positive weight
+            Active chains: enabled with a positive weight
+          </p>
+        </article>
+
+        <article className="rounded-2xl border border-white/15 bg-white/[0.03] p-6">
+          <p className="text-sm text-gray-400">
+            Configured chains
+          </p>
+          <p className="mt-4 text-4xl font-bold tabular-nums">
+            {mixes.length}
+          </p>
+          <p className="mt-3 text-xs text-gray-500">
+            Stored mix entries
           </p>
         </article>
       </section>
@@ -116,31 +150,47 @@ export default async function PromptChainsPage() {
       {/* Make the current runtime behavior explicit. */}
       <div
         role="note"
-        className="mt-8 rounded-xl border border-indigo-500/20 bg-indigo-500/[0.05] p-5"
+        className="mt-8 grid gap-5 rounded-xl border border-indigo-500/20 bg-indigo-500/[0.05] p-5 lg:grid-cols-[2fr_1fr]"
       >
-        <p className="text-sm font-semibold text-indigo-300">
-          Configuration preview
-        </p>
+        <div>
+          <p className="text-sm font-semibold text-indigo-300">
+            Configuration preview
+          </p>
 
-        <p className="mt-2 text-sm leading-6 text-gray-400">
-          These prompt chains are stored in the database.
-          Caption generation still uses the original hardcoded
-          prompt until database-driven selection is integrated
-          and tested.
-        </p>
+          <p className="mt-2 text-sm leading-6 text-gray-400">
+            These prompt chains are stored in the database. Mix changes
+            are configuration only and are saved to Supabase. Live caption
+            generation still uses the original hardcoded prompt until
+            database-driven selection is integrated and tested.
+          </p>
+        </div>
+
+        <div className="border-t border-indigo-500/20 pt-5 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
+          <p className="text-sm text-gray-400">Routing mode</p>
+          <p className="mt-2 text-lg font-semibold">Relative weights</p>
+          <p className="mt-2 text-xs text-gray-500">
+            Weights do not need to total 100
+          </p>
+        </div>
       </div>
 
       {/* Prompt chain records */}
-      <section className="mt-12">
+      <section id="mix-configuration" className="mt-12 scroll-mt-40 md:scroll-mt-6">
         <div className="mb-6">
           <h2 className="text-xl font-semibold">
             Chain configurations
           </h2>
 
           <p className="mt-2 text-sm text-gray-500">
-            Read-only definitions and ordered steps
+            Read-only definitions and ordered steps, with editable mix settings
           </p>
         </div>
+
+        {feedback && !hasFeedbackTarget && (
+          <div className="mb-6">
+            <MixFeedback feedback={feedback} />
+          </div>
+        )}
 
         {chains.length === 0 ? (
           <div className="rounded-2xl border border-white/15 p-10 text-center text-gray-400">
@@ -189,7 +239,9 @@ export default async function PromptChainsPage() {
                               : "border-white/15 text-gray-400"
                           }`}
                         >
-                          {mix?.enabled ? "Enabled" : "Disabled"}
+                          {mix
+                            ? `${mix.enabled ? "Enabled" : "Disabled"} · ${mix.enabled && mix.weight > 0 ? "Active" : "Inactive"}`
+                            : "Not configured"}
                         </span>
                       </div>
                     </div>
@@ -221,6 +273,18 @@ export default async function PromptChainsPage() {
                       </div>
                     </div>
                   </div>
+
+                  {mix ? (
+                    <MixSettingsForm
+                      mix={mix}
+                      chainName={chain.name}
+                      feedback={params.chain === chain.id ? feedback : undefined}
+                    />
+                  ) : (
+                    <p className="border-t border-white/10 p-6 text-sm text-gray-500">
+                      No prompt chain mix entry is configured for this chain.
+                    </p>
+                  )}
 
                   {/* Individual chain steps */}
                   <div className="border-t border-white/10 p-6">
@@ -287,6 +351,49 @@ export default async function PromptChainsPage() {
                 </article>
               );
             })}
+          </div>
+        )}
+
+        {mixes.length === 0 && (
+          <p className="mt-6 text-sm text-gray-400">
+            No prompt chain mix entries found.
+          </p>
+        )}
+
+        {unmatchedMixes.length > 0 && (
+          <div className="mt-6 space-y-6">
+            <p className="text-sm text-amber-300">
+              These mix entries have no available chain definition. Their
+              existing settings can still be managed below.
+            </p>
+            {unmatchedMixes.map((mix) => (
+              <article
+                key={mix.chain_id}
+                className="overflow-hidden rounded-2xl border border-white/15 bg-white/[0.025]"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-4 p-6">
+                  <div className="min-w-0">
+                    <p className="break-all font-mono text-xs text-indigo-300">
+                      {mix.chain_id}
+                    </p>
+                    <h3 className="mt-3 text-xl font-semibold">Unknown chain</h3>
+                    <p className="mt-2 text-sm text-gray-400">No description.</p>
+                  </div>
+                  <span className={`rounded-full border px-3 py-1 text-xs ${
+                    mix.enabled
+                      ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                      : "border-white/15 text-gray-400"
+                  }`}>
+                    {mix.enabled ? "Enabled" : "Disabled"} · {mix.enabled && mix.weight > 0 ? "Active" : "Inactive"}
+                  </span>
+                </div>
+                <MixSettingsForm
+                  mix={mix}
+                  chainName={`unknown chain ${mix.chain_id}`}
+                  feedback={params.chain === mix.chain_id ? feedback : undefined}
+                />
+              </article>
+            ))}
           </div>
         )}
       </section>

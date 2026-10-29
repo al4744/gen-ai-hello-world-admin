@@ -10,6 +10,7 @@ import {
 } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import InlineFormError from "./inline-form-error";
 
 type GenerationFormProps = {
   userId: string;
@@ -320,9 +321,7 @@ export default function GenerationForm({
           )}
 
           {message && (
-            <p role="alert" className="text-center text-sm">
-              {message}
-            </p>
+            <InlineFormError title="Unable to create battle" message={message} />
           )}
 
           {file && !generating && message && (

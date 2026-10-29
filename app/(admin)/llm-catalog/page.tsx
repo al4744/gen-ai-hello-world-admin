@@ -1,3 +1,5 @@
+import ActionForm from "@/components/action-form";
+import SubmitButton from "@/components/submit-button";
 
 import Link from "next/link";
 import { connection } from "next/server";
@@ -5,12 +7,10 @@ import { requireSuperadmin } from "@/lib/auth/require-superadmin";
 import {
   createProvider,
   updateProvider,
-  deleteProvider,
 } from "./provider-actions";
 import {
   createModel,
   updateModel,
-  deleteModel,
 } from "./model-actions";
 
 export const instant = false;
@@ -25,6 +25,9 @@ const cardClass =
 
 const buttonClass =
   "cursor-pointer rounded-xl bg-indigo-500 px-6 py-3 font-semibold text-white transition-colors hover:bg-indigo-400";
+
+const createButtonClass =
+  "cursor-pointer rounded-xl bg-white px-6 py-3 text-sm font-semibold text-black transition-colors hover:bg-gray-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-indigo-400 motion-reduce:transition-none";
 
 const deleteClass =
   "cursor-pointer rounded-xl border border-red-500/40 bg-red-500/10 px-6 py-3 font-semibold text-red-300 hover:bg-red-500/20";
@@ -261,16 +264,14 @@ function ModelFields({
   );
 }
 
-function DeleteForm({
+function DeleteSection({
   id,
   name,
-  action,
   kind,
 }: {
   id: string;
   name: string;
-  action: (formData: FormData) => Promise<void>;
-  kind: string;
+  kind: "provider" | "model";
 }) {
   return (
     <div className="mt-8 border-t border-red-500/20 pt-6">
@@ -278,27 +279,15 @@ function DeleteForm({
         Delete {kind}
       </h4>
       <p className="mt-2 text-sm text-gray-400">
-        This action is permanent. Type the exact confirmation:
+        This action is permanent and cannot be undone.
       </p>
-      <p className="mt-2 break-all font-mono text-sm text-red-300">
-        DELETE {name}
-      </p>
-      <form action={action} className="mt-5 space-y-4">
-        <input type="hidden" name="id" value={id} />
-        <input
-          name="confirmation"
-          type="text"
-          required
-          autoComplete="off"
-          aria-label={`Confirm deletion of ${name}`}
-          className={inputClass}
-        />
-        <div>
-          <button type="submit" className={deleteClass}>
-            Permanently Delete
-          </button>
-        </div>
-      </form>
+      <Link
+        href={`/delete/${kind}/${id}`}
+        aria-label={`Delete ${kind} ${name}`}
+        className={`${deleteClass} mt-5 inline-block transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-red-400 motion-reduce:transition-none`}
+      >
+        Permanently Delete
+      </Link>
     </div>
   );
 }
@@ -473,15 +462,16 @@ export default async function LLMCatalogPage({
           <h3 className="text-xl font-semibold">
             Create a provider
           </h3>
-          <form
+          <ActionForm
             action={createProvider}
+            errorTitle="Unable to create provider"
             className="mt-8 space-y-6"
           >
             <ProviderFields prefix="new-provider" />
-            <button type="submit" className={buttonClass}>
+            <SubmitButton type="submit" className={createButtonClass}>
               Create Provider
-            </button>
-          </form>
+            </SubmitButton>
+          </ActionForm>
         </div>
 
         <div className="mt-10">
@@ -537,8 +527,9 @@ export default async function LLMCatalogPage({
                       Edit or delete provider
                     </summary>
 
-                    <form
+                    <ActionForm
                       action={updateProvider}
+                      errorTitle="Unable to update provider"
                       className="mt-8 space-y-6"
                     >
                       <input
@@ -550,18 +541,17 @@ export default async function LLMCatalogPage({
                         prefix={`provider-${provider.id}`}
                         values={provider}
                       />
-                      <button
+                      <SubmitButton
                         type="submit"
                         className={buttonClass}
                       >
                         Save Provider Changes
-                      </button>
-                    </form>
+                      </SubmitButton>
+                    </ActionForm>
 
-                    <DeleteForm
+                    <DeleteSection
                       id={provider.id}
                       name={provider.name}
-                      action={deleteProvider}
                       kind="provider"
                     />
                   </details>
@@ -605,22 +595,23 @@ export default async function LLMCatalogPage({
             </p>
           )}
 
-          <form
+          <ActionForm
             action={createModel}
+            errorTitle="Unable to create model"
             className="mt-8 space-y-6"
           >
             <ModelFields
               prefix="new-model"
               providers={providerOptions}
             />
-            <button
+            <SubmitButton
               type="submit"
               disabled={providerOptions.length === 0}
-              className={`${buttonClass} disabled:cursor-not-allowed disabled:opacity-40`}
+              className={`${createButtonClass} disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white`}
             >
               Create Model
-            </button>
-          </form>
+            </SubmitButton>
+          </ActionForm>
         </div>
 
         <div className="mt-10">
@@ -675,8 +666,9 @@ export default async function LLMCatalogPage({
                       Edit or delete model
                     </summary>
 
-                    <form
+                    <ActionForm
                       action={updateModel}
+                      errorTitle="Unable to update model"
                       className="mt-8 space-y-6"
                     >
                       <input
@@ -689,18 +681,17 @@ export default async function LLMCatalogPage({
                         providers={providerOptions}
                         values={model}
                       />
-                      <button
+                      <SubmitButton
                         type="submit"
                         className={buttonClass}
                       >
                         Save Model Changes
-                      </button>
-                    </form>
+                      </SubmitButton>
+                    </ActionForm>
 
-                    <DeleteForm
+                    <DeleteSection
                       id={model.id}
                       name={model.display_name}
-                      action={deleteModel}
                       kind="model"
                     />
                   </details>

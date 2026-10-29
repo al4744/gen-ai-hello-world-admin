@@ -4,6 +4,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireSuperadmin } from "@/lib/auth/require-superadmin";
+import { FormError, runAction } from "@/lib/action-state";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -30,52 +31,42 @@ function validateExample(formData: FormData) {
   const isActive = formData.get("isActive") === "on";
 
   if (title.length < 1 || title.length > 150) {
-    throw new Error(
-      "Title must be between 1 and 150 characters."
-    );
+    throw new FormError("Title must be between 1 and 150 characters.", "title");
   }
 
   if (userContext.length > 500) {
-    throw new Error(
-      "User context must be 500 characters or fewer."
-    );
+    throw new FormError("User context must be 500 characters or fewer.", "userContext");
   }
 
   if (captionA.length < 1 || captionA.length > 500) {
-    throw new Error(
-      "Caption A must be between 1 and 500 characters."
-    );
+    throw new FormError("Caption A must be between 1 and 500 characters.", "captionA");
   }
 
   if (captionB.length < 1 || captionB.length > 500) {
-    throw new Error(
-      "Caption B must be between 1 and 500 characters."
-    );
+    throw new FormError("Caption B must be between 1 and 500 characters.", "captionB");
   }
 
   if (captionA === captionB) {
-    throw new Error(
-      "Caption A and Caption B must be different."
+    throw new FormError(
+      "Caption A and Caption B must be different.", "captionB"
     );
   }
 
   if (notes.length > 2000) {
-    throw new Error(
-      "Notes must be 2000 characters or fewer."
-    );
+    throw new FormError("Notes must be 2000 characters or fewer.", "notes");
   }
 
   let sourceGenerationSetId: number | null = null;
 
   if (rawSourceId) {
     if (!/^[1-9]\d*$/.test(rawSourceId)) {
-      throw new Error("Invalid source battle ID.");
+      throw new FormError("Invalid source battle ID.", "sourceGenerationSetId");
     }
 
     const numericId = Number(rawSourceId);
 
     if (!Number.isSafeInteger(numericId)) {
-      throw new Error("Invalid source battle ID.");
+      throw new FormError("Invalid source battle ID.", "sourceGenerationSetId");
     }
 
     sourceGenerationSetId = numericId;
@@ -99,30 +90,34 @@ function validateExample(formData: FormData) {
 export async function createGenerationExample(
   formData: FormData
 ) {
-  const { supabase } = await requireSuperadmin();
+  return runAction(async () => {
+    const { supabase } = await requireSuperadmin();
 
-  const values = validateExample(formData);
+    const values = validateExample(formData);
 
-  const { error } = await supabase
-    .from("ai_generation_examples")
-    .insert(values);
+    const { error } = await supabase
+      .from("ai_generation_examples")
+      .insert(values);
 
-  if (error) {
-    console.error(
-      "Create AI generation example failed:",
-      error
-    );
+    if (error) {
+      console.error(
+        "Create AI generation example failed:",
+        error
+      );
 
-    throw new Error(
-      error.code === "23503"
-        ? "The selected source battle does not exist."
-        : "Unable to create AI generation example."
-    );
-  }
+      if (error.code === "23503") {
+        throw new FormError("The selected source battle does not exist.", "sourceGenerationSetId");
+      }
+      if (error.code === "23505") {
+        throw new FormError("This example conflicts with an existing record.");
+      }
+      throw new Error("Unable to create AI generation example.");
+    }
 
-  revalidatePath(EXAMPLES_PATH);
+    revalidatePath(EXAMPLES_PATH);
 
-  redirect(`${EXAMPLES_PATH}?created=1`);
+    redirect(`${EXAMPLES_PATH}?created=1`);
+  });
 }
 
 // =====================================================
@@ -132,42 +127,49 @@ export async function createGenerationExample(
 export async function updateGenerationExample(
   formData: FormData
 ) {
-  const { supabase } = await requireSuperadmin();
+  return runAction(async () => {
+    const { supabase } = await requireSuperadmin();
 
-  const id = readText(formData, "id");
+    const id = readText(formData, "id");
 
-  if (!UUID_PATTERN.test(id)) {
-    throw new Error("Invalid example ID.");
-  }
+    if (!UUID_PATTERN.test(id)) {
+      throw new FormError("Invalid example ID.");
+    }
 
-  const values = validateExample(formData);
+    const values = validateExample(formData);
 
-  const { data, error } = await supabase
-    .from("ai_generation_examples")
-    .update({
-      ...values,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", id)
-    .select("id")
-    .single();
+    const { data, error } = await supabase
+      .from("ai_generation_examples")
+      .update({
+        ...values,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .select("id")
+      .single();
 
-  if (error || !data) {
-    console.error(
-      "Update AI generation example failed:",
-      error
-    );
+    if (error || !data) {
+      console.error(
+        "Update AI generation example failed:",
+        error
+      );
 
-    throw new Error(
-      error?.code === "23503"
-        ? "The selected source battle does not exist."
-        : "Unable to update AI generation example."
-    );
-  }
+      if (error?.code === "23503") {
+        throw new FormError("The selected source battle does not exist.", "sourceGenerationSetId");
+      }
+      if (error?.code === "23505") {
+        throw new FormError("This example conflicts with an existing record.");
+      }
+      if (!error || error.code === "PGRST116") {
+        throw new FormError("This example no longer exists. Refresh the page before trying again.");
+      }
+      throw new Error("Unable to update AI generation example.");
+    }
 
-  revalidatePath(EXAMPLES_PATH);
+    revalidatePath(EXAMPLES_PATH);
 
-  redirect(`${EXAMPLES_PATH}?updated=1`);
+    redirect(`${EXAMPLES_PATH}?updated=1`);
+  });
 }
 
 // =====================================================
@@ -180,17 +182,13 @@ export async function deleteGenerationExample(
   const { supabase } = await requireSuperadmin();
 
   const id = readText(formData, "id");
-  const confirmation = readText(
-    formData,
-    "confirmation"
-  );
 
   if (!UUID_PATTERN.test(id)) {
-    throw new Error("Invalid example ID.");
+    throw new FormError("Invalid example ID.");
   }
 
   // Read the current title directly from Supabase.
-  // Never trust a hidden form field for deletion confirmation.
+  // Resolve the record by its validated ID before deleting it.
   const { data: existing, error: lookupError } =
     await supabase
       .from("ai_generation_examples")
@@ -198,17 +196,13 @@ export async function deleteGenerationExample(
       .eq("id", id)
       .single();
 
-  if (lookupError || !existing) {
-    throw new Error("AI generation example not found.");
+  if (lookupError && lookupError.code !== "PGRST116") {
+    console.error("Deletion lookup failed:", lookupError);
+    throw new Error("Unable to read the record for deletion.");
   }
 
-  const expectedConfirmation =
-    `DELETE ${existing.title}`;
-
-  if (confirmation !== expectedConfirmation) {
-    throw new Error(
-      `Deletion requires typing: ${expectedConfirmation}`
-    );
+  if (lookupError || !existing) {
+    throw new FormError("AI generation example not found.");
   }
 
   const { data, error } = await supabase
@@ -219,6 +213,9 @@ export async function deleteGenerationExample(
     .single();
 
   if (error || !data) {
+    if (error?.code === "23503") {
+      throw new FormError("This record is still referenced by other records and cannot be deleted.");
+    }
     console.error(
       "Delete AI generation example failed:",
       error

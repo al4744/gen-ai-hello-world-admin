@@ -1,3 +1,6 @@
+import ActionForm from "@/components/action-form";
+import SubmitButton from "@/components/submit-button";
+import type { FormAction } from "@/lib/action-state";
 
 import Link from "next/link";
 import { connection } from "next/server";
@@ -5,12 +8,10 @@ import { requireSuperadmin } from "@/lib/auth/require-superadmin";
 import {
   createSignupDomain,
   updateSignupDomain,
-  deleteSignupDomain,
 } from "./domain-actions";
 import {
   createWhitelistedEmail,
   updateWhitelistedEmail,
-  deleteWhitelistedEmail,
 } from "./email-actions";
 
 export const instant = false;
@@ -25,6 +26,9 @@ const cardClass =
 
 const buttonClass =
   "cursor-pointer rounded-xl bg-indigo-500 px-6 py-3 font-semibold text-white transition-colors hover:bg-indigo-400";
+
+const createButtonClass =
+  "cursor-pointer rounded-xl bg-white px-6 py-3 text-sm font-semibold text-black transition-colors hover:bg-gray-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-indigo-400 motion-reduce:transition-none";
 
 const deleteClass =
   "cursor-pointer rounded-xl border border-red-500/40 bg-red-500/10 px-6 py-3 font-semibold text-red-300 hover:bg-red-500/20";
@@ -41,8 +45,6 @@ type AccessItem = {
   created_at: string;
 };
 
-type ServerAction = (formData: FormData) => Promise<void>;
-
 type AccessSectionProps = {
   kind: "domain" | "email";
   title: string;
@@ -53,9 +55,8 @@ type AccessSectionProps = {
   totalPages: number;
   previousHref: string;
   nextHref: string;
-  createAction: ServerAction;
-  updateAction: ServerAction;
-  deleteAction: ServerAction;
+  createAction: FormAction;
+  updateAction: FormAction;
 };
 
 function safePage(value?: string) {
@@ -151,14 +152,12 @@ function AccessFields({
   );
 }
 
-function DeleteForm({
+function DeleteSection({
   item,
   kind,
-  action,
 }: {
   item: AccessItem;
   kind: "domain" | "email";
-  action: ServerAction;
 }) {
   return (
     <div className="mt-10 border-t border-red-500/20 pt-6">
@@ -167,39 +166,16 @@ function DeleteForm({
       </h4>
 
       <p className="mt-2 text-sm text-gray-400">
-        This permanently removes the record. Enter the
-        exact confirmation below.
+        This permanently removes the record and cannot be undone.
       </p>
 
-      <p className="mt-3 break-all font-mono text-sm text-red-300">
-        DELETE {item.value}
-      </p>
-
-      <form action={action} className="mt-5 space-y-4">
-        <input type="hidden" name="id" value={item.id} />
-
-        <label
-          htmlFor={`delete-${kind}-${item.id}`}
-          className="block text-sm font-medium"
-        >
-          Confirmation
-        </label>
-
-        <input
-          id={`delete-${kind}-${item.id}`}
-          name="confirmation"
-          type="text"
-          required
-          autoComplete="off"
-          className={inputClass}
-        />
-
-        <div>
-          <button type="submit" className={deleteClass}>
-            Permanently Delete
-          </button>
-        </div>
-      </form>
+      <Link
+        href={`/delete/${kind}/${item.id}`}
+        aria-label={`Delete ${kind} ${item.value}`}
+        className={`${deleteClass} mt-5 inline-block transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-red-400 motion-reduce:transition-none`}
+      >
+        Permanently Delete
+      </Link>
     </div>
   );
 }
@@ -216,7 +192,6 @@ function AccessSection({
   nextHref,
   createAction,
   updateAction,
-  deleteAction,
 }: AccessSectionProps) {
   const plural = kind === "domain" ? "domains" : "emails";
 
@@ -246,13 +221,13 @@ function AccessSection({
           </span>
         </div>
 
-        <form action={createAction} className="mt-8 space-y-6">
+        <ActionForm action={createAction} errorTitle={`Unable to create ${kind}`} className="mt-8 space-y-6">
           <AccessFields kind={kind} prefix={`new-${kind}`} />
 
-          <button type="submit" className={buttonClass}>
+          <SubmitButton type="submit" className={createButtonClass}>
             Create {kind === "domain" ? "Domain" : "Email"}
-          </button>
-        </form>
+          </SubmitButton>
+        </ActionForm>
       </div>
 
       {/* READ */}
@@ -324,8 +299,9 @@ function AccessSection({
                     Edit or delete {kind}
                   </summary>
 
-                  <form
+                  <ActionForm
                     action={updateAction}
+                    errorTitle={`Unable to update ${kind}`}
                     className="mt-8 space-y-6"
                   >
                     <input
@@ -340,18 +316,17 @@ function AccessSection({
                       item={item}
                     />
 
-                    <button
+                    <SubmitButton
                       type="submit"
                       className={buttonClass}
                     >
                       Save Changes
-                    </button>
-                  </form>
+                    </SubmitButton>
+                  </ActionForm>
 
-                  <DeleteForm
+                  <DeleteSection
                     item={item}
                     kind={kind}
-                    action={deleteAction}
                   />
                 </details>
               </article>
@@ -505,7 +480,7 @@ export default async function SignupAccessPage({
       <div className="mt-8 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 text-sm text-amber-200">
         These records are administrative configuration.
         Signup restrictions are not enforced until integrated
-        into the main application's authentication flow.
+        into the main application&apos;s authentication flow.
       </div>
 
       <AccessSection
@@ -520,7 +495,6 @@ export default async function SignupAccessPage({
         nextHref={pageHref(domainsPage + 1, emailsPage)}
         createAction={createSignupDomain}
         updateAction={updateSignupDomain}
-        deleteAction={deleteSignupDomain}
       />
 
       <div className="mt-16 border-t border-white/10 pt-2">
@@ -536,7 +510,6 @@ export default async function SignupAccessPage({
           nextHref={pageHref(domainsPage, emailsPage + 1)}
           createAction={createWhitelistedEmail}
           updateAction={updateWhitelistedEmail}
-          deleteAction={deleteWhitelistedEmail}
         />
       </div>
     </main>

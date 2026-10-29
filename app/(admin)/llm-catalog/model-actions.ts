@@ -4,6 +4,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireSuperadmin } from "@/lib/auth/require-superadmin";
+import { FormError, runAction } from "@/lib/action-state";
 
 const PAGE_PATH = "/llm-catalog";
 
@@ -16,7 +17,7 @@ function getText(formData: FormData, key: string): string {
   if (value === null) return "";
 
   if (typeof value !== "string") {
-    throw new Error(`Invalid ${key}.`);
+    throw new FormError(`Invalid ${key}.`, key);
   }
 
   return value.trim();
@@ -26,7 +27,7 @@ function getId(formData: FormData): string {
   const id = getText(formData, "id");
 
   if (!UUID_PATTERN.test(id)) {
-    throw new Error("Invalid model ID.");
+    throw new FormError("Invalid model ID.");
   }
 
   return id;
@@ -40,25 +41,19 @@ function getModelInput(formData: FormData) {
   const isActive = formData.get("isActive") === "on";
 
   if (!UUID_PATTERN.test(providerId)) {
-    throw new Error("Please select a valid LLM provider.");
+    throw new FormError("Please select a valid LLM provider.", "providerId");
   }
 
   if (modelId.length < 1 || modelId.length > 200) {
-    throw new Error(
-      "Model identifier must be 1–200 characters."
-    );
+    throw new FormError("Model identifier must be 1–200 characters.", "modelId");
   }
 
   if (displayName.length < 1 || displayName.length > 150) {
-    throw new Error(
-      "Display name must be 1–150 characters."
-    );
+    throw new FormError("Display name must be 1–150 characters.", "displayName");
   }
 
   if (description.length > 2000) {
-    throw new Error(
-      "Description must be at most 2000 characters."
-    );
+    throw new FormError("Description must be at most 2000 characters.", "description");
   }
 
   return {
@@ -73,74 +68,81 @@ function getModelInput(formData: FormData) {
 // CREATE MODEL
 
 export async function createModel(formData: FormData) {
-  const { supabase } = await requireSuperadmin();
+  return runAction(async () => {
+    const { supabase } = await requireSuperadmin();
 
-  const input = getModelInput(formData);
+    const input = getModelInput(formData);
 
-  const { error } = await supabase
-    .from("llm_models")
-    .insert(input);
+    const { error } = await supabase
+      .from("llm_models")
+      .insert(input);
 
-  if (error) {
-    console.error("Create LLM model failed:", error);
+    if (error) {
+      console.error("Create LLM model failed:", error);
 
-    if (error.code === "23505") {
-      throw new Error(
-        "This model identifier already exists for the selected provider."
-      );
+      if (error.code === "23505") {
+        throw new FormError(
+          "This model identifier already exists for the selected provider.", "modelId"
+        );
+      }
+
+      if (error.code === "23503") {
+        throw new FormError(
+          "The selected LLM provider does not exist.", "providerId"
+        );
+      }
+
+      throw new Error("Could not create LLM model.");
     }
 
-    if (error.code === "23503") {
-      throw new Error(
-        "The selected LLM prov does not exist."
-      );
-    }
-
-    throw new Error("Could not create LLM model.");
-  }
-
-  revalidatePath(PAGE_PATH);
-  redirect(`${PAGE_PATH}?modelCreated=1`);
+    revalidatePath(PAGE_PATH);
+    redirect(`${PAGE_PATH}?modelCreated=1`);
+  });
 }
 
 // UPDATE MODEL
 
 export async function updateModel(formData: FormData) {
-  const { supabase } = await requireSuperadmin();
+  return runAction(async () => {
+    const { supabase } = await requireSuperadmin();
 
-  const id = getId(formData);
-  const input = getModelInput(formData);
+    const id = getId(formData);
+    const input = getModelInput(formData);
 
-  const { data, error } = await supabase
-    .from("llm_models")
-    .update({
-      ...input,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", id)
-    .select("id")
-    .single();
+    const { data, error } = await supabase
+      .from("llm_models")
+      .update({
+        ...input,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .select("id")
+      .single();
 
-  if (error || !data) {
-    console.error("Update LLM model failed:", error);
+    if (error || !data) {
+      console.error("Update LLM model failed:", error);
 
-    if (error?.code === "23505") {
-      throw new Error(
-        "This model identifier already exists for the selected provider."
-      );
+      if (error?.code === "23505") {
+        throw new FormError(
+          "This model identifier already exists for the selected provider.", "modelId"
+        );
+      }
+
+      if (error?.code === "23503") {
+        throw new FormError(
+          "The selected LLM provider does not exist.", "providerId"
+        );
+      }
+
+      if (!error || error.code === "PGRST116") {
+        throw new FormError("This model no longer exists. Refresh the page before trying again.");
+      }
+      throw new Error("Could not update LLM model.");
     }
 
-    if (error?.code === "23503") {
-      throw new Error(
-        "The selected LLM provider does not exist."
-      );
-    }
-
-    throw new Error("Could not update LLM model.");
-  }
-
-  revalidatePath(PAGE_PATH);
-  redirect(`${PAGE_PATH}?modelUpdated=1`);
+    revalidatePath(PAGE_PATH);
+    redirect(`${PAGE_PATH}?modelUpdated=1`);
+  });
 }
 
 // DELETE MODEL
@@ -149,7 +151,6 @@ export async function deleteModel(formData: FormData) {
   const { supabase } = await requireSuperadmin();
 
   const id = getId(formData);
-  const confirmation = getText(formData, "confirmation");
 
   const { data: existing, error: readError } = await supabase
     .from("llm_models")
@@ -157,14 +158,13 @@ export async function deleteModel(formData: FormData) {
     .eq("id", id)
     .single();
 
-  if (readError || !existing) {
-    throw new Error("LLM model not found.");
+  if (readError && readError.code !== "PGRST116") {
+    console.error("Deletion lookup failed:", readError);
+    throw new Error("Unable to read the record for deletion.");
   }
 
-  if (confirmation !== `DELETE ${existing.display_name}`) {
-    throw new Error(
-      `To delete this model, enter exactly: DELETE ${existing.display_name}`
-    );
+  if (readError || !existing) {
+    throw new FormError("LLM model not found.");
   }
 
   const { data, error } = await supabase
@@ -175,6 +175,9 @@ export async function deleteModel(formData: FormData) {
     .single();
 
   if (error || !data) {
+    if (error?.code === "23503") {
+      throw new FormError("This record is still referenced by other records and cannot be deleted.");
+    }
     console.error("Delete LLM model failed:", error);
     throw new Error("Could not delete LLM model.");
   }

@@ -118,6 +118,7 @@ export async function replaceBattleImage(
     await storage.download(rawNewPath);
 
   if (downloadError || !imageBlob) {
+    if (downloadError) console.error("Replacement image download failed:", downloadError);
     return {
       ok: false,
       error: "Replacement image could not be verified.",
@@ -157,11 +158,12 @@ export async function replaceBattleImage(
     .maybeSingle();
 
   if (readError || !battle) {
+    if (readError) console.error("Replacement battle lookup failed:", readError);
     await cleanupNewImage();
 
     return {
       ok: false,
-      error: "Battle not found.",
+      error: readError ? "Unable to load this battle. Please try again." : "Battle not found.",
     };
   }
 

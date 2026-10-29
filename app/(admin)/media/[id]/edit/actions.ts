@@ -4,6 +4,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireSuperadmin } from "@/lib/auth/require-superadmin";
+import { FormError, runAction } from "@/lib/action-state";
 
 function parseId(value: FormDataEntryValue | null) {
   if (typeof value !== "string" || !/^[1-9]\d*$/.test(value)) {
@@ -15,42 +16,47 @@ function parseId(value: FormDataEntryValue | null) {
 }
 
 export async function saveCaption(formData: FormData) {
-  // Every mutation independently verifies superadmin access.
-  const { supabase } = await requireSuperadmin();
+  return runAction(async () => {
+    // Every mutation independently verifies superadmin access.
+    const { supabase } = await requireSuperadmin();
 
-  const battleId = parseId(formData.get("battleId"));
-  const captionId = parseId(formData.get("captionId"));
-  const rawContent = formData.get("content");
+    const battleId = parseId(formData.get("battleId"));
+    const captionId = parseId(formData.get("captionId"));
+    const rawContent = formData.get("content");
 
-  if (!battleId || !captionId) {
-    redirect("/media");
-  }
+    if (!battleId || !captionId) {
+      throw new FormError("Invalid battle or caption ID. Refresh the page before trying again.");
+    }
 
-  const content =
-    typeof rawContent === "string" ? rawContent.trim() : "";
+    const content =
+      typeof rawContent === "string" ? rawContent.trim() : "";
 
-  if (!content || content.length > 500) {
-    redirect(`/media/${battleId}/edit?error=invalid`);
-  }
+    if (!content || content.length > 500) {
+      throw new FormError("Caption must contain between 1 and 500 characters.", "content");
+    }
 
-  // Update exactly one caption belonging to the specified battle.
-  const { data, error } = await supabase
-    .from("generations")
-    .update({ content })
-    .eq("id", captionId)
-    .eq("generation_set_id", battleId)
-    .select("id")
-    .single();
+    // Update exactly one caption belonging to the specified battle.
+    const { data, error } = await supabase
+      .from("generations")
+      .update({ content })
+      .eq("id", captionId)
+      .eq("generation_set_id", battleId)
+      .select("id")
+      .single();
 
-  if (error || !data) {
-    console.error("Admin caption update failed:", error);
-    redirect(`/media/${battleId}/edit?error=save`);
-  }
+    if (error || !data) {
+      console.error("Admin caption update failed:", error);
+      if (!error || error.code === "PGRST116") {
+        throw new FormError("This caption no longer exists. Refresh the page before trying again.");
+      }
+      throw new Error("Unable to update the caption.");
+    }
 
-  revalidatePath("/media");
-  revalidatePath(`/media/${battleId}/edit`);
+    revalidatePath("/media");
+    revalidatePath(`/media/${battleId}/edit`);
 
-  redirect(`/media/${battleId}/edit?saved=${captionId}`);
+    redirect(`/media/${battleId}/edit?saved=${captionId}`);
+  });
 }
 
 
@@ -59,14 +65,9 @@ export async function deleteBattle(formData: FormData) {
     const { supabase } = await requireSuperadmin();
 
     const battleId = parseId(formData.get("battleId"));
-    const confirmation = formData.get("confirmation");
 
     if (!battleId) {
       redirect("/media");
-    }
-
-    if (confirmation !== `DELETE ${battleId}`) {
-      redirect(`/media/${battleId}/edit?error=confirmation`);
     }
 
     // Read the exact battle before deleting anything.
@@ -76,8 +77,13 @@ export async function deleteBattle(formData: FormData) {
       .eq("id", battleId)
       .maybeSingle();
 
-    if (readError || !battle) {
-      redirect(`/media/${battleId}/edit?error=delete`);
+    if (readError) {
+      console.error("Admin battle lookup failed:", readError);
+      throw new Error("Unable to load this battle for deletion.");
+    }
+
+    if (!battle) {
+      throw new FormError("This battle no longer exists or was already deleted.");
     }
 
     // Avoid deleting an image used by another battle.
@@ -90,7 +96,8 @@ export async function deleteBattle(formData: FormData) {
         .eq("image_path", battle.image_path);
 
       if (countError || count === null) {
-        redirect(`/media/${battleId}/edit?error=delete`);
+        console.error("Admin battle image reference check failed:", countError);
+        throw new FormError("Unable to verify image references. No changes were saved.");
       }
 
       removeImage = count === 1;
@@ -106,7 +113,7 @@ export async function deleteBattle(formData: FormData) {
 
     if (deleteError || !deleted) {
       console.error("Admin battle deletion failed:", deleteError);
-      redirect(`/media/${battleId}/edit?error=delete`);
+      throw new Error("Could not delete the battle. Please try again.");
     }
 
     // Storage is separate from the Postgres transaction.

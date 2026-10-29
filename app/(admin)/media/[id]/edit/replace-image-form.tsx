@@ -5,6 +5,7 @@ import { useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { replaceBattleImage } from "./replace-image-action";
+import InlineFormError from "@/components/inline-form-error";
 
 const MAX_SIZE = 5 * 1024 * 1024;
 
@@ -27,6 +28,7 @@ export default function ReplaceImageForm({
 }: Props) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const requestInFlightRef = useRef(false);
 
   const [file, setFile] = useState<File | null>(null);
   const [acknowledged, setAcknowledged] = useState(false);
@@ -39,7 +41,7 @@ export default function ReplaceImageForm({
   ) {
     event.preventDefault();
 
-    if (pending) return;
+    if (requestInFlightRef.current) return;
 
     setMessage("");
     setIsError(false);
@@ -77,6 +79,7 @@ export default function ReplaceImageForm({
 
     if (!confirmed) return;
 
+    requestInFlightRef.current = true;
     setPending(true);
 
     try {
@@ -144,6 +147,7 @@ export default function ReplaceImageForm({
       );
       setIsError(true);
     } finally {
+      requestInFlightRef.current = false;
       setPending(false);
     }
   }
@@ -220,12 +224,14 @@ export default function ReplaceImageForm({
           {pending ? "Replacing Image..." : "Replace Image"}
         </button>
 
-        {message && (
+        {message && isError && (
+          <InlineFormError title="Unable to replace image" message={message} />
+        )}
+
+        {message && !isError && (
           <p
-            role={isError ? "alert" : "status"}
-            className={`text-sm ${
-              isError ? "text-red-300" : "text-emerald-300"
-            }`}
+            role="status"
+            className="text-sm text-emerald-300"
           >
             {message}
           </p>

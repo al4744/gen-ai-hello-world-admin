@@ -26,29 +26,24 @@ const navigation = [
     number: "07",
   },
   {
-    label: "Prompt Chain Mix",
-    href: "/prompt-chain-mix",
-    number: "08",
-  },
-  {
     label: "Terms",
     href: "/terms",
-    number: "09",
+    number: "08",
   },
   {
     label: "AI Generation Examples",
     href: "/ai-generation-examples",
-    number: "10",
+    number: "09",
   },
   {
     label: "LLM Catalog",
     href: "/llm-catalog",
-    number: "11",
+    number: "10",
   },
   {
     label: "Signup Access",
     href: "/signup-access",
-    number: "12",
+    number: "11",
   },
 ];
 

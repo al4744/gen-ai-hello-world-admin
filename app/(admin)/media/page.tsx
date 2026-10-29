@@ -6,6 +6,24 @@ export const instant = false;
 
 const PAGE_SIZE = 12;
 
+function PencilIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      focusable="false"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-6 w-6"
+    >
+      <path d="m16 3 5 5M4 15 16 3a3.54 3.54 0 0 1 5 5L9 20l-6 1 1-6Z" />
+    </svg>
+  );
+}
+
 type MediaPageProps = {
     searchParams: Promise<{
       page?: string;
@@ -155,9 +173,11 @@ export default async function MediaPage({
               );
 
               return (
-                <article
+                <Link
                   key={battle.id}
-                  className="overflow-hidden rounded-2xl border border-white/15 bg-white/[0.025]"
+                  href={`/media/${battle.id}/edit`}
+                  aria-label={`Edit battle #${battle.id} — open battle editor`}
+                  className="group relative block cursor-pointer overflow-hidden rounded-2xl border border-white/15 bg-white/[0.025] transition-colors duration-150 hover:border-white/40 focus-visible:border-white/40 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-indigo-400 motion-reduce:transition-none"
                 >
                   <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
                     <h3 className="text-lg font-semibold">
@@ -177,7 +197,7 @@ export default async function MediaPage({
                     </span>
                   </div>
 
-                  <div className="flex h-64 items-center justify-center bg-black/40">
+                  <div className="relative flex h-64 items-center justify-center bg-black/40">
                     {imageUrl ? (
                       // Public Supabase Storage image.
                       // eslint-disable-next-line @next/next/no-img-element
@@ -192,6 +212,13 @@ export default async function MediaPage({
                         No image available
                       </p>
                     )}
+                    <span
+                      aria-hidden="true"
+                      className="pointer-events-none absolute right-3 top-3 hidden flex-col items-center gap-1 rounded-xl border border-white/20 bg-black/75 px-3 py-2 text-xs font-medium text-white [@media(hover:none)]:flex pointer-coarse:flex"
+                    >
+                      <PencilIcon />
+                      <span>Edit</span>
+                    </span>
                   </div>
 
                   <div className="space-y-4 p-5">
@@ -231,17 +258,19 @@ export default async function MediaPage({
 
                       <p className="break-all text-xs text-gray-500">
                         Creator: {battle.creator_id}
-                        </p>
-
-                        <Link
-                        href={`/media/${battle.id}/edit`}
-                        className="mt-4 inline-block rounded-lg border border-white/20 px-4 py-2 text-sm font-medium transition-colors hover:bg-white/10"
-                        >
-                        Edit Captions →
-                        </Link>
+                      </p>
                     </div>
                   </div>
-                </article>
+                  <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/55 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100 motion-reduce:transition-none"
+                  >
+                    <span className="flex flex-col items-center gap-2 rounded-2xl border border-white/20 bg-zinc-900/90 px-6 py-5 text-sm font-medium text-white shadow-xl">
+                      <PencilIcon />
+                      <span>Edit</span>
+                    </span>
+                  </div>
+                </Link>
               );
             })}
           </div>

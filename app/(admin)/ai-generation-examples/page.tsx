@@ -1,3 +1,5 @@
+import ActionForm from "@/components/action-form";
+import SubmitButton from "@/components/submit-button";
 
 import Link from "next/link";
 import { connection } from "next/server";
@@ -5,7 +7,6 @@ import { requireSuperadmin } from "@/lib/auth/require-superadmin";
 import {
   createGenerationExample,
   updateGenerationExample,
-  deleteGenerationExample,
 } from "./actions";
 
 export const instant = false;
@@ -258,16 +259,16 @@ export default async function AIGenerationExamplesPage({
           </span>
         </div>
 
-        <form action={createGenerationExample} className="mt-8 space-y-6">
+        <ActionForm action={createGenerationExample} errorTitle="Unable to create example" className="mt-8 space-y-6">
           <ExampleFields prefix="new" />
 
-          <button
+          <SubmitButton
             type="submit"
-            className="cursor-pointer rounded-xl bg-indigo-500 px-6 py-3 font-semibold text-white transition-colors hover:bg-indigo-400"
+            className="cursor-pointer rounded-xl bg-white px-6 py-3 text-sm font-semibold text-black transition-colors hover:bg-gray-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-indigo-400 motion-reduce:transition-none"
           >
             Create Example
-          </button>
-        </form>
+          </SubmitButton>
+        </ActionForm>
       </section>
 
       {/* READ, UPDATE, DELETE */}
@@ -363,8 +364,9 @@ export default async function AIGenerationExamplesPage({
                     Edit or delete this example
                   </summary>
 
-                  <form
+                  <ActionForm
                     action={updateGenerationExample}
+                    errorTitle="Unable to update example"
                     className="mt-8 space-y-6"
                   >
                     <input
@@ -378,13 +380,13 @@ export default async function AIGenerationExamplesPage({
                       values={example}
                     />
 
-                    <button
+                    <SubmitButton
                       type="submit"
                       className="cursor-pointer rounded-xl bg-indigo-500 px-6 py-3 font-semibold text-white transition-colors hover:bg-indigo-400"
                     >
                       Save Changes
-                    </button>
-                  </form>
+                    </SubmitButton>
+                  </ActionForm>
 
                   <div className="mt-10 border-t border-red-500/20 pt-6">
                     <h4 className="font-semibold text-red-300">
@@ -393,44 +395,15 @@ export default async function AIGenerationExamplesPage({
 
                     <p className="mt-2 text-sm text-gray-400">
                       This permanently removes the example.
-                      Type the exact confirmation below.
                     </p>
 
-                    <form
-                      action={deleteGenerationExample}
-                      className="mt-5 space-y-4"
+                    <Link
+                      href={`/delete/example/${example.id}`}
+                      aria-label={`Delete example ${example.title}`}
+                      className="mt-5 inline-block cursor-pointer rounded-xl border border-red-500/40 bg-red-500/10 px-6 py-3 font-semibold text-red-300 transition-colors hover:bg-red-500/20 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-red-400 motion-reduce:transition-none"
                     >
-                      <input
-                        type="hidden"
-                        name="id"
-                        value={example.id}
-                      />
-
-                      <label
-                        htmlFor={`delete-${example.id}`}
-                        className={labelClass}
-                      >
-                        Confirmation: DELETE {example.title}
-                      </label>
-
-                      <input
-                        id={`delete-${example.id}`}
-                        name="confirmation"
-                        type="text"
-                        required
-                        autoComplete="off"
-                        className={inputClass}
-                      />
-
-                      <div>
-                        <button
-                          type="submit"
-                          className="cursor-pointer rounded-xl border border-red-500/40 bg-red-500/10 px-6 py-3 font-semibold text-red-300 transition-colors hover:bg-red-500/20"
-                        >
-                          Permanently Delete
-                        </button>
-                      </div>
-                    </form>
+                      Permanently Delete
+                    </Link>
                   </div>
                 </details>
               </article>

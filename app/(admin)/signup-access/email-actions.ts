@@ -4,6 +4,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireSuperadmin } from "@/lib/auth/require-superadmin";
+import { FormError, runAction } from "@/lib/action-state";
 
 const PAGE_PATH = "/signup-access";
 
@@ -19,7 +20,7 @@ function getText(formData: FormData, key: string): string {
   if (value === null) return "";
 
   if (typeof value !== "string") {
-    throw new Error(`Invalid ${key}.`);
+    throw new FormError(`Invalid ${key}.`, key);
   }
 
   return value.trim();
@@ -29,7 +30,7 @@ function getId(formData: FormData): string {
   const id = getText(formData, "id");
 
   if (!UUID_PATTERN.test(id)) {
-    throw new Error("Invalid whitelisted email ID.");
+    throw new FormError("Invalid whitelisted email ID.");
   }
 
   return id;
@@ -45,15 +46,11 @@ function getEmailInput(formData: FormData) {
     email.length > 254 ||
     !EMAIL_PATTERN.test(email)
   ) {
-    throw new Error(
-      "Enter a valid email address, such as student@columbia.edu."
-    );
+    throw new FormError("Enter a valid email address, such as student@columbia.edu.", "email");
   }
 
   if (description.length > 2000) {
-    throw new Error(
-      "Description must be at most 2000 characters."
-    );
+    throw new FormError("Description must be at most 2000 characters.", "description");
   }
 
   return {
@@ -68,28 +65,30 @@ function getEmailInput(formData: FormData) {
 export async function createWhitelistedEmail(
   formData: FormData
 ) {
-  const { supabase } = await requireSuperadmin();
+  return runAction(async () => {
+    const { supabase } = await requireSuperadmin();
 
-  const input = getEmailInput(formData);
+    const input = getEmailInput(formData);
 
-  const { error } = await supabase
-    .from("whitelisted_emails")
-    .insert(input);
+    const { error } = await supabase
+      .from("whitelisted_emails")
+      .insert(input);
 
-  if (error) {
-    console.error("Create whitelisted email failed:", error);
+    if (error) {
+      console.error("Create whitelisted email failed:", error);
 
-    if (error.code === "23505") {
-      throw new Error(
-        "This email address is already whitelisted."
-      );
+      if (error.code === "23505") {
+        throw new FormError(
+          "This email address is already whitelisted.", "email"
+        );
+      }
+
+      throw new Error("Could not create whitelisted email.");
     }
 
-    throw new Error("Could not create whitelisted email.");
-  }
-
-  revalidatePath(PAGE_PATH);
-  redirect(`${PAGE_PATH}?emailCreated=1`);
+    revalidatePath(PAGE_PATH);
+    redirect(`${PAGE_PATH}?emailCreated=1`);
+  });
 }
 
 // UPDATE WHITELISTED EMAIL
@@ -97,35 +96,40 @@ export async function createWhitelistedEmail(
 export async function updateWhitelistedEmail(
   formData: FormData
 ) {
-  const { supabase } = await requireSuperadmin();
+  return runAction(async () => {
+    const { supabase } = await requireSuperadmin();
 
-  const id = getId(formData);
-  const input = getEmailInput(formData);
+    const id = getId(formData);
+    const input = getEmailInput(formData);
 
-  const { data, error } = await supabase
-    .from("whitelisted_emails")
-    .update({
-      ...input,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", id)
-    .select("id")
-    .single();
+    const { data, error } = await supabase
+      .from("whitelisted_emails")
+      .update({
+        ...input,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .select("id")
+      .single();
 
-  if (error || !data) {
-    console.error("Update whitelisted email failed:", error);
+    if (error || !data) {
+      console.error("Update whitelisted email failed:", error);
 
-    if (error?.code === "23505") {
-      throw new Error(
-        "This email address is already whitelisted."
-      );
+      if (error?.code === "23505") {
+        throw new FormError(
+          "This email address is already whitelisted.", "email"
+        );
+      }
+
+      if (!error || error.code === "PGRST116") {
+        throw new FormError("This whitelisted email no longer exists. Refresh the page before trying again.");
+      }
+      throw new Error("Could not update whitelisted email.");
     }
 
-    throw new Error("Could not update whitelisted email.");
-  }
-
-  revalidatePath(PAGE_PATH);
-  redirect(`${PAGE_PATH}?emailUpdated=1`);
+    revalidatePath(PAGE_PATH);
+    redirect(`${PAGE_PATH}?emailUpdated=1`);
+  });
 }
 
 // DELETE WHITELISTED EMAIL
@@ -136,7 +140,6 @@ export async function deleteWhitelistedEmail(
   const { supabase } = await requireSuperadmin();
 
   const id = getId(formData);
-  const confirmation = getText(formData, "confirmation");
 
   const { data: existing, error: readError } = await supabase
     .from("whitelisted_emails")
@@ -144,14 +147,13 @@ export async function deleteWhitelistedEmail(
     .eq("id", id)
     .single();
 
-  if (readError || !existing) {
-    throw new Error("Whitelisted email not found.");
+  if (readError && readError.code !== "PGRST116") {
+    console.error("Deletion lookup failed:", readError);
+    throw new Error("Unable to read the record for deletion.");
   }
 
-  if (confirmation !== `DELETE ${existing.email}`) {
-    throw new Error(
-      `To delete this email, enter exactly: DELETE ${existing.email}`
-    );
+  if (readError || !existing) {
+    throw new FormError("Whitelisted email not found.");
   }
 
   const { data, error } = await supabase
@@ -162,6 +164,9 @@ export async function deleteWhitelistedEmail(
     .single();
 
   if (error || !data) {
+    if (error?.code === "23503") {
+      throw new FormError("This record is still referenced by other records and cannot be deleted.");
+    }
     console.error("Delete whitelisted email failed:", error);
     throw new Error("Could not delete whitelisted email.");
   }
