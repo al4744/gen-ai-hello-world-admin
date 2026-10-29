@@ -20,6 +20,16 @@ const navigation = [
     href: "/llm-responses",
     number: "06",
   },
+  {
+    label: "Prompt Chains",
+    href: "/prompt-chains",
+    number: "07",
+  },
+  {
+    label: "Prompt Chain Mix",
+    href: "/prompt-chain-mix",
+    number: "08",
+  },
 ];
 
 export default function AdminNav() {
