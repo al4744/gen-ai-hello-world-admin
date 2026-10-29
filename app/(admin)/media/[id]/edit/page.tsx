@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireSuperadmin } from "@/lib/auth/require-superadmin";
 import { deleteBattle, saveCaption } from "./actions";
+import ReplaceImageForm from "./replace-image-form";
 
 export const instant = false;
 
@@ -19,7 +20,7 @@ export default async function EditMediaPage({
   searchParams,
 }: EditPageProps) {
   // Verify superadmin access before reading the battle.
-  const { supabase } = await requireSuperadmin();
+  const { user, supabase } = await requireSuperadmin();
 
   const { id } = await params;
   const query = await searchParams;
@@ -87,8 +88,8 @@ export default async function EditMediaPage({
         </h1>
 
         <p className="mt-4 text-gray-400">
-          Update caption text without changing the image,
-          voting records, or original generation metadata.
+          Edit captions or replace the uploaded image.
+          Existing votes and generation metadata are preserved.
         </p>
       </header>
 
@@ -101,6 +102,12 @@ export default async function EditMediaPage({
           className="mt-10 max-h-96 w-full rounded-2xl border border-white/15 object-contain"
         />
       )}
+
+      <ReplaceImageForm
+        battleId={battle.id}
+        userId={user.id}
+        currentImagePath={battle.image_path}
+      />
 
       {/* Display caption editing and deletion errors. */}
       {query.error && (
