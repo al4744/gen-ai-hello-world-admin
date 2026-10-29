@@ -45,6 +45,11 @@ const navigation = [
     href: "/llm-catalog",
     number: "11",
   },
+  {
+    label: "Signup Access",
+    href: "/signup-access",
+    number: "12",
+  },
 ];
 
 export default function AdminNav() {
