@@ -10,6 +10,16 @@ const navigation = [
   { label: "Users", href: "/users", number: "02" },
   { label: "Media", href: "/media", number: "03" },
   { label: "Votes", href: "/votes", number: "04" },
+  {
+    label: "Generation Requests",
+    href: "/generation-requests",
+    number: "05",
+  },
+  {
+    label: "LLM Responses",
+    href: "/llm-responses",
+    number: "06",
+  },
 ];
 
 export default function AdminNav() {
